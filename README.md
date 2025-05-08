@@ -1,20 +1,133 @@
-# Data Obfuscation with Strategy & Factory Patterns
+# Data Obfuscation with Strategy and Decorator Patterns
 
-This project implements data obfuscation using the **Strategy** design pattern in combination with a simple **Factory** pattern to dynamically assign obfuscation behavior based on user roles. The goal is to ensure that sensitive user information is selectively hidden or shown depending on the permission level of the requestor, while keeping the architecture clean, extensible, and easy to maintain.
+This project demonstrates a combined use of the **Strategy** and **Decorator** design patterns to support flexible and extensible data obfuscation logic. It is a console application that processes a set of users and, depending on the user's role and options, selectively hides or formats sensitive fields.
+
+The goal is to show how Strategy can control *what data is shown* and Decorator can control *how it's displayed or enhanced*, all while keeping the architecture modular and open to future changes.
+
+---
+
+## How It Works
+
+- The **Strategy Pattern** is used to define different obfuscation rules for each user role (e.g., `Admin`, `SuperAdmin`, `User`).
+- The **Decorator Pattern** is layered on top to apply additional formatting or behavior (e.g., wrapping in HTML, adding disclaimers).
+- A **Factory method** selects the strategy based on the role and dynamically applies one or more decorators based on command-line input.
+
+---
 
 ## Why Strategy?
 
-The **Strategy** pattern allows us to encapsulate different obfuscation behaviors into isolated classes. Each role (e.g., `SuperAdmin`, `Admin`, `NonPrivileged`) has its own `Obfuscate()` implementation, defining exactly what user fields should be exposed. This approach avoids cluttering a single class with conditional logic (if/else or switch statements), and instead favors composition over inheritance, making it easier to test, debug, and extend.
+Rather than writing role logic using `if/else` blocks, we encapsulate role-based behavior in separate classes:
 
-Rather than scattering permission-based formatting throughout the codebase, each strategy class clearly represents a single, well-defined responsibility. For example, the `AdminObfuscationStrategy` includes most user information but deliberately omits contact details, while the `NonPrivilegedStrategy` restricts output to just a user's name.
+- `AdminObfuscationStrategy` shows limited info.
+- `SuperAdminObfuscationStrategy` shows everything.
+- `NonPrivilegedStrategy` restricts output to a basic set.
 
-## Why a Factory?
+This follows the **Open/Closed Principle**: we can add new roles by creating new classes, without touching existing logic.
 
-To avoid placing the burden of choosing the right strategy on calling code, we use a **Factory** that selects the correct `IDataObfuscationStrategy` implementation based on the current user's role. This encapsulates decision-making logic and ensures consistent strategy assignment. The Factory design also makes future role-based behavior changes easy—just add a new role-strategy pair without touching existing logic.
+---
+
+## Why Decorator?
+
+Decorator allows us to enhance or modify the result of a strategy *without changing the strategy itself*. It’s ideal for layering cross-cutting concerns such as:
+
+- Wrapping output in HTML tags
+- Adding disclaimers
+- Logging or timestamping (extensible)
+
+This keeps our role logic clean and allows behavior stacking.
+
+## Strategy Implementation Overview
+
+At the heart of the design is an interface (`IDataObfuscation`) with a single method:
+
+```csharp
+public interface IDataObfuscationStrategy
+{
+    string Obfuscate();
+}
+```
+
+Each strategy class implements this interface and receives a UserData object, then determines which fields to reveal based on that role’s permissions.
+
+A base class (BaseObfuscationStrategy) provides shared setup logic like holding a reference to the UserData so individual strategy classes can stay focused on their unique obfuscation behavior.
+
+Here's what a simple strategy might look like:
+
+```csharp
+public class NonPrivilegedStrategy : BaseObfuscationStrategy
+{
+    public NonPrivilegedStrategy(UserData user) : base(user) { }
+
+    public override string Obfuscate()
+    {
+        return $"{User.FirstName} {User.LastName}";
+    }
+}
+```
+
+In the calling code, we assign a strategy based on the user's role using a simple switch statement (or another mapping structure), then delegate to the chosen strategy:
+
+```csharp
+IDataObfuscationStrategy strategy = role switch
+{
+    "SuperAdmin" => new SuperAdminObfuscationStrategy(user),
+    "Admin" => new AdminObfuscationStrategy(user),
+    "User" => new NonPrivilegedStrategy(user),
+    _ => throw new ArgumentException("Invalid role")
+};
+
+var obfuscated = strategy.Obfuscate();
+
+```
+
+Even though we use a switch here, the actual logic is offloaded into the separate strategy classes, keeping our control flow light and our business logic decoupled.
+
+### Decorator Implementation Overview
+Once a strategy has determined what data to show, decorators allow us to enhance or modify how that data is presented, without touching the underlying logic.
+
+At the heart of the design is a common interface (IDataObfuscation) which is implemented by both concrete strategies and decorators. This means decorators can wrap strategies, or even other decorators, in a flexible chain.
+
+Here's what a simple decoratro might look like:
+
+```csharp
+public class HtmlWrapperDecorator : ObfuscationDecorator
+{
+    public HtmlWrapperDecorator(IDataObfuscation inner) : base(inner) { }
+
+    public override string Obfuscate()
+    {
+        return $"<div class='user'>{Inner.Obfuscate()}</div>";
+    }
+}
+```
+
+### Applying Decorators with a Factory
+Decorators are dynamically selected using DataDecoratorsFactory, which takes a list of keys and applies them in order:
+
+```csharp
+baseStrategy = decorator switch
+{
+    "html" => new HtmlWrapperDecorator(baseStrategy),
+    "disclaimer" => new DisclaimerDecorator(baseStrategy),
+    _ => baseStrategy
+};
+```
+
+### Putting it together
+After choosing a strategy, decorators are added as needed based on user input:
+
+```csharp
+var strategy = new AdminObfuscationStrategy(user);
+var decorated = DataDecoratorsFactory.ApplyDecorators(strategy, new List<string> { "html", "disclaimer" });
+
+Console.WriteLine(decorated.Obfuscate());
+```
 
 ## Extensibility
 
-By using an abstract base class (`BaseObfuscationStrategy`) to handle shared logic like constructor setup, we reduce redundancy across strategy classes. If new roles are added in the future (like `Manager`, `Auditor`, or `Guest`), we can support them simply by creating a new class that inherits from the base and overrides the `Obfuscate()` method. There's no risk of breaking existing behavior, and no need to modify core logic elsewhere in the application.
+Adding support for a new role only requires creating a new class that inherits from BaseObfuscationStrategy and implements the Obfuscate() method. There's no need to touch existing strategies, which reduces the risk of regression.
+
+This makes the system very maintainable. If a new role like Manager, Auditor, or Guest is introduced, it can be integrated in a few lines without touching the rest of the codebase.
 
 ## Adding a New Obfuscation Strategy
 
@@ -36,6 +149,7 @@ public class ManagerObfuscationStrategy : BaseObfuscationStrategy
         return $"{User.FirstName} {User.LastName}, {User.State}";
     }
 }
+```
 
 ### Step 2: Register the Strategy in the Factory
 
@@ -58,3 +172,67 @@ public static class ObfuscationStrategyFactory
         };
     }
 }
+```
+
+### Step 3: Use the Decorator
+
+Now you can include "Manager" in your command line arguments to apply the new strategy:
+
+```bash
+dotnet run manager
+```
+
+## Adding a new Obfuscation Decorator
+
+One of the main benefits of the Decorator Pattern is its support for layering behavior without modifying existing code. This section walks through adding a new output modifier, let’s say a TimestampDecorator that appends the current UTC time to the obfuscation result.
+
+### Create the Decorator Class
+
+Create a new class that inherits from ObfuscationDecorator and overrides the Obfuscate() method to add timestamp functionality.
+
+```csharp
+public class TimestampDecorator : ObfuscationDecorator
+{
+    public TimestampDecorator(IDataObfuscation inner) : base(inner) { }
+
+    public override string Obfuscate()
+    {
+        return $"{Inner.Obfuscate()}\nGenerated at: {DateTime.UtcNow:u}";
+    }
+}
+```
+
+This class simply appends a UTC timestamp to whatever output the wrapped strategy or decorator provides.
+
+### Step 2: Register the Decorator in the Factory
+
+Add the new decorator keyword to the DataDecoratorsFactory so it can be invoked dynamically at runtime:
+
+```csharp
+public static class DataDecoratorsFactory
+{
+    public static IDataObfuscation ApplyDecorators(IDataObfuscation baseStrategy, List<string> decorators)
+    {
+        foreach (var decorator in decorators)
+        {
+            baseStrategy = decorator switch
+            {
+                "html" => new HtmlWrapperDecorator(baseStrategy),
+                "disclaimer" => new DisclaimerDecorator(baseStrategy),
+                "timestamp" => new TimestampDecorator(baseStrategy),
+                _ => baseStrategy
+            };
+        }
+
+        return baseStrategy;
+    }
+}
+```
+
+### Step 3: Use the Decorator
+
+Now you can include "timestamp" in your command-line args or configuration to apply the new behavior:
+
+```bash
+dotnet run admin timestamp
+```

@@ -7,25 +7,24 @@ class Program
     {
         if (args.Length > 0)
         {
+            List<string> decorators = new List<string>();
             string firstArgument = args[0];
-            Console.WriteLine($"First argument: {firstArgument}");
+            Console.WriteLine($"Strategy: {firstArgument}");
+            if(args.Length > 1)
+            {
+                for (int i = 1; i < args.Length; i++)
+                {
+                    decorators.Add(args[i]);
+                }
+                Console.WriteLine($"Decorators: {string.Join(", ", decorators)}");       
             
-            // Pass the argument to the Start function
-            Start(firstArgument);
+            }
+            Start(firstArgument, decorators);
         }
-        else
-        {
-            Console.WriteLine("No arguments provided.");
-        }
-    
     }
 
-    static void Start(string argument)
+    static void Start(string argument, List<string> decorators)
     {
-        // Placeholder for the Start function implementation
-        Console.WriteLine($"Start function called with argument: {argument}");
-
-         // Example usage of the DataObfuscationStrategyFactory and strategies
 
         var users = new List<UserData>
         {
@@ -50,11 +49,12 @@ class Program
             new() { Id = 19, FirstName = "Samuel", LastName = "Price", Address = "903 Maple Ave", State = "Arizona", Email = "samuel.price@example.com", Country = "USA", Phone = "555-999-0000" },
         };
 
-        var strategies = new List<IDataObfuscationStrategy>();
+        var strategies = new List<IDataObfuscation>();
 
         foreach (var user in users)
         {
             var strategy = DataObfuscationStrategyFactory.CreateObfuscationStrategy(argument, user);
+            strategy = DataDecoratorsFactory.ApplyDecorators(strategy, decorators);
             strategies.Add(strategy);
         }
         foreach(var strat in strategies)

@@ -1,6 +1,6 @@
 public class DataObfuscationStrategyFactory
 {
-    public static IDataObfuscationStrategy CreateObfuscationStrategy(string strategyType, UserData userData)
+    public static IDataObfuscation CreateObfuscationStrategy(string strategyType, UserData userData)
     {
         return strategyType switch
         {

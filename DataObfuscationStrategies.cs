@@ -1,10 +1,12 @@
-public interface IDataObfuscationStrategy
+public interface IDataObfuscation
+
 {
     string Obfuscate();
 }
 
 // Abstract base class for shared UserData handling
-public abstract class BaseObfuscationStrategy(UserData user) : IDataObfuscationStrategy
+public abstract class BaseObfuscationStrategy(UserData user) : IDataObfuscation
+
 {
     protected readonly UserData User = user;
 
