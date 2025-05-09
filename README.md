@@ -151,8 +151,6 @@ public class ManagerObfuscationStrategy : BaseObfuscationStrategy
 }
 ```
 
-```
-
 ### Step 2: Register the Strategy in the Factory
 
 Update your `ObfuscationStrategyFactory` to return your new strategy when the "Manager" role is encountered.
