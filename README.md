@@ -129,7 +129,7 @@ var obfuscated = strategy.Obfuscate();
 
 Even though we use a switch here, the actual logic of what we return is offloaded to the separate strategy classes, keeping our control flow light and our business logic decoupled.
 
-### Decorator Implementation Overview
+## Decorator Implementation Overview
 Once a strategy has determined what data to show, decorators allow us to enhance or modify how that data is presented, without touching the underlying logic.
 
 At the heart of the design is a common interface (IDataObfuscation) which is implemented by both concrete strategies and decorators. This means decorators can wrap strategies, or even other decorators, in a flexible chain.
