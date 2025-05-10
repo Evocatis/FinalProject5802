@@ -2,7 +2,7 @@
 1. Download dotnet - https://dotnet.microsoft.com/en-us/download
 2. Download this repository
 3. Open a console in the directory
-4. run : `dotnet run <strategy> <decorator> <decorator> <etc>`
+4. Run : `dotnet run <strategy> <decorator> <decorator> <etc>`
 
 
 # Data Obfuscation with Strategy and Decorator Patterns
