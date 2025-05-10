@@ -1,3 +1,10 @@
+# Setup
+1. Download dotnet - https://dotnet.microsoft.com/en-us/download
+2. Download this repository
+3. Open a console in the directory
+4. run : `dotnet run <strategy> <decorator> <decorator> <etc>`
+
+
 # Data Obfuscation with Strategy and Decorator Patterns
 
 This project demonstrates a combined use of the **Strategy** and **Decorator** design patterns to support flexible and extensible data obfuscation logic. It is a console application that processes a set of users and, depending on the user's role and options, selectively hides or formats sensitive fields.
@@ -25,6 +32,19 @@ Rather than writing role logic using `if/else` blocks, we encapsulate role-based
 This follows the **Open/Closed Principle**: we can add new roles by creating new classes, without touching existing logic.
 
 ---
+
+### Why Strategy? Industry Knowledge
+
+At first glance, using a Strategy pattern might seem like overkill, especially when the logic is simple. But in a large, complex codebase, Strategy can be a lifesaver. Without it, you're often left dealing with massive if-else chains, sometimes hundreds of lines long, scattered across multiple files. That makes the system hard to understand and maintain.
+
+I saw this firsthand in a project at work. We had a chunk of code with 27 if statements just to determine what a user could see in a record. Making changes meant digging through a mess of logic and hoping to land in the right spot. Eventually, a senior developer on our team asked me, "Have you ever heard of the Strategy pattern? It could be a great fit here."
+
+We ended up refactoring the code using Strategy, similar to what you see in this codebase. The result was a much cleaner and more modular solution. It allowed us to programmatically obfuscate data across thousands of records in a way that was easy to extend, test, and understand.
+
+### What if?
+What if we didn't use the Strategy Pattern and instead shoved everything into one large if statement? That's exactly what I demonstrate in the WhyWeUseStrategies.cs file.
+Now imagine having to maintain or modify that massive block of logic finding the right section, understanding how one change might cause unintended side effects elsewhere, and navigating nested conditions just to update a specific behavior. It’s messy, fragile, and hard to scale.
+When we do use strategies, each behavior is isolated, easy to find, and safe to modify. That’s the power of the Strategy Pattern.
 
 ## Why Decorator?
 
@@ -65,29 +85,56 @@ public class NonPrivilegedStrategy : BaseObfuscationStrategy
 }
 ```
 
-In the calling code, we assign a strategy based on the user's role using a simple switch statement (or another mapping structure), then delegate to the chosen strategy:
+In the calling code, we assign a strategy based on the user's role using a simple switch statement (or another mapping structure), then delegate to the chosen strategy or creation factory:
 
 ```csharp
-IDataObfuscationStrategy strategy = role switch
-{
-    "SuperAdmin" => new SuperAdminObfuscationStrategy(user),
-    "Admin" => new AdminObfuscationStrategy(user),
-    "User" => new NonPrivilegedStrategy(user),
-    _ => throw new ArgumentException("Invalid role")
-};
+ public static IDataObfuscation CreateObfuscationStrategy(string baseUser, UserData userData)
+    {
+        return baseUser switch
+        {
+            "SuperAdmin" => new SuperAdminObfuscationStrategy(userData),
+            "Admin" => CreateAdminObfuscationFactory(baseUser, userData),
+            _ => CreateNonPrivilegedObfuscationFactory(baseUser, userData),
+        };
+    }
+
+    public static IDataObfuscation CreateAdminObfuscationFactory(string baseUser, UserData userData)
+    {
+        return userData.Role switch
+        {
+            "SuperAdmin" => new NonPrivilegedStrategy(userData),
+            "Admin" => new NonPrivilegedStrategy(userData),
+            "User" => new AdminObfuscationStrategy(userData),
+            "American" => new AdminToAmerican(userData),
+            "Driver" => new AdminObfuscationStrategy(userData),
+            _ => CreateNonPrivilegedObfuscationFactory(baseUser, userData),
+        };
+    }
+
+    public static IDataObfuscation CreateNonPrivilegedObfuscationFactory(string baseUser, UserData userData)
+    {
+        if (baseUser == userData.Role)
+        {
+            return new AdminObfuscationStrategy(userData);
+        }
+        else
+        {
+            return new NonPrivilegedStrategy(userData);
+        }
+    }
 
 var obfuscated = strategy.Obfuscate();
 
 ```
 
-Even though we use a switch here, the actual logic is offloaded into the separate strategy classes, keeping our control flow light and our business logic decoupled.
+Even though we use a switch here, the actual logic of what we return is offloaded to the separate strategy classes, keeping our control flow light and our business logic decoupled.
 
 ### Decorator Implementation Overview
 Once a strategy has determined what data to show, decorators allow us to enhance or modify how that data is presented, without touching the underlying logic.
 
 At the heart of the design is a common interface (IDataObfuscation) which is implemented by both concrete strategies and decorators. This means decorators can wrap strategies, or even other decorators, in a flexible chain.
 
-Here's what a simple decoratro might look like:
+Here's what a simple decorator might look like:
 
 ```csharp
 public class HtmlWrapperDecorator : ObfuscationDecorator
@@ -125,7 +172,7 @@ Console.WriteLine(decorated.Obfuscate());
 
 ## Extensibility
 
-Adding support for a new role only requires creating a new class that inherits from BaseObfuscationStrategy and implements the Obfuscate() method. There's no need to touch existing strategies, which reduces the risk of regression.
+Adding support for a new role only requires creating a new  class that inherits from BaseObfuscationStrategy and implements the Obfuscate() method. There's no need to touch existing strategies, which reduces the risk of regression.
 
 This makes the system very maintainable. If a new role like Manager, Auditor, or Guest is introduced, it can be integrated in a few lines without touching the rest of the codebase.
 
@@ -158,20 +205,16 @@ Update your `ObfuscationStrategyFactory` to return your new strategy when the "M
 Example:
 
 ```csharp
-public static class ObfuscationStrategyFactory
-{
-    public static IDataObfuscationStrategy Create(UserData user, string role)
+public static IDataObfuscation CreateObfuscationStrategy(string baseUser, UserData userData)
     {
-        return role switch
+        return baseUser switch
         {
-            "SuperAdmin" => new SuperAdminObfuscationStrategy(user),
-            "Admin" => new AdminObfuscationStrategy(user),
-            "Manager" => new ManagerObfuscationStrategy(user),
-            "User" => new NonPrivilegedStrategy(user),
-            _ => throw new ArgumentException("Invalid role")
+            "SuperAdmin" => new SuperAdminObfuscationStrategy(userData),
+            "Admin" => CreateAdminObfuscationPattern(baseUser, userData),
+            "Manager" => new ManagerObfuscationStrategy(baseUser, userData),
+            _ => CreateNonPrivilegedObfuscationPattern(baseUser, userData),
         };
     }
-}
 ```
 
 ### Step 3: Use the Decorator

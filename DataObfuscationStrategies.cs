@@ -39,3 +39,12 @@ public class NonPrivilegedStrategy(UserData user) : BaseObfuscationStrategy(user
         return $"{User.FirstName} {User.LastName}";
     }
 }
+
+// Admin Viewing American sees USA
+public class AdminToAmerican(UserData user) : BaseObfuscationStrategy(user)
+{
+    public override string Obfuscate()
+    {
+        return $"{User.Country}";
+    }
+}
